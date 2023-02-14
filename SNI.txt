@@ -1,0 +1,154 @@
+port security
+
+interface fastEthernet 0/1
+switchport mode access 
+switchport port-security 
+switchport port-security mac-address 0040.0BB2.D640
+switchport port-security violation shutdown
+
+
+interface fastEthernet 0/1
+switchport mode access 
+switchport port-security 
+switchport port-security mac-address sticky 
+switchport port-security maximum 2
+switchport port-security violation restrict
+
+
+-------------
+
+AAA
+
+
+Switch>en
+Switch#conf t
+Switch(config)#no ip domain-lookup 
+Switch(config)#enable password 1234
+Switch(config)#enable secret 12345
+Switch(config)#service password-encryption 
+
+————————— Console ——————————
+Switch(config)#username XXX secret XXX
+Switch(config)#aaa new-model 
+Switch(config)#aaa authentication login default local
+Switch(config)#line console 0
+Switch(config-line)#login authentication default 
+
+—————————Line VTY ——————- 
+
+S1(config)#ip domain-name seusl.lk
+S1(config)#hostname S1
+S1(config)#aaa authentication login SSH-LOGIN local
+
+S1(config)#line vty 0 4
+S1(config-line)#login authentication SSH-LOGIN
+S1(config-line)#transport input ssh
+
+S1(config-line)#int vlan1
+S1(config-if)#ip address 192.168.0.10 255.255.255.0
+
+
+——————————— TACAS+ ————————
+Router1(config)#username XXX secret XXX
+Router1(config)#tacacs-server host 192.168.2.2
+Router1(config)#tacacs-server key XXX
+Router1(config)#aaa new-model 
+Router1(config)#aaa authentication login default group tacacs+ local
+Router1(config)#line console 0
+Router1(config-line)#login authentication default 
+
+
+Router1(config)#ip domain-name cisco.com
+Router1(config)#crypto key generate rsa
+
+Router1(config)#line vty 0 4
+Router1(config-line)#login authentication default 
+Router1(config-line)#transport input ssh 
+
+—————————— RADIUS ————————
+Router(config)#username XXX secret XXX
+Router(config)#radius-server host 192.168.2.2
+Router(config)#radius-server key 1234
+Router(config)#aaa new-model 
+Router(config)#aaa authentication login default group radius local
+
+Router1(config)#line console 0
+Router1(config-line)#login authentication default 
+
+Router1(config)#ip domain-name cisco.com
+Router1(config)#crypto key generate rsa
+
+Router1(config)#line vty 0 4
+Router1(config-line)#login authentication default 
+Router1(config-line)#transport input ssh
+
+-------------------- IP SEC -----------------------
+router1 and 2
+license boot module c2900 technology-package securityk9
+wr
+reload
+
+router 1
+access-list 110 permit udp host 10.10.10.2 host 10.10.10.1 eq isakmp
+access-list 110 permit udp host 10.10.10.2 host 10.10.10.1 eq non500-isakmp
+access-list 110 permit ahp host 10.10.10.2 host 10.10.10.1
+access-list 110 permit esp host 10.10.10.2 host 10.10.10.1
+
+Interface Gig 0/1
+IP access-group 110 in
+
+router 2
+access-list 110 permit udp host 10.10.10.1 host 10.10.10.2 eq isakmp
+access-list 110 permit udp host 10.10.10.1 host 10.10.10.2 eq non500-isakmp
+access-list 110 permit ahp host 10.10.10.1 host 10.10.10.2
+access-list 110 permit esp host 10.10.10.1 host 10.10.10.2
+
+Interface Gig 0/1
+IP access-group 110 in
+
+router 1
+access-list 120 permit ip 192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255
+
+router 2
+access-list 120 permit ip 192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255
+
+router 1and 2
+Crypto isakmp policy 50
+Encryption aes 128
+Authentication pre-share
+Group 5
+Lifetime 86400
+Hash sha
+
+router 1 and 2
+Crypto isakmp key seuslipsec2022 address 10.10.10.2
+
+router 1 and 2
+Crypto ipsec transform-set SEUSL-TS esp-aes esp-sha-hmac
+
+router 1 and 2
+Crypto map SEUSL-MAP 20 ipsec-isakmp
+Match address 120
+Set transform-set SEUSL-TS
+Set peer 10.10.10.2
+Set security-association lifetime seconds 86400
+
+router 1 and 2
+Interface Gig 0/0
+Crypto map SEUSL-MAP
+
+Commands to check your configuration
+	Show crypto isakmp policy
+	Show crypto ipsec transform set
+	Show crypto map
+	Show access-list
+
+Commands to check established sa
+	Show crypto isakmp sa
+	Show crypto ipsec sa
+
+Debug commands
+	Debug crypto isakmp
+	Debug crypto ipsec
+
+
